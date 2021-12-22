@@ -81,7 +81,31 @@ app.post("/todos", checksExistsUserAccount, (request, response) => {
 });
 
 app.put("/todos/:id", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { user } = request;
+  const { deadline, title } = request.body;
+  const { id } = request.params;
+
+  if (!title || !deadline) {
+    return response
+      .status(400)
+      .json({ error: "Title and deadline properties cannot be empty" });
+  }
+
+  const todoIndex = user.todos.findIndex((todo) => todo.id === id);
+
+  if (todoIndex === -1) {
+    return response.status(404).json({ error: "Todo not found" });
+  }
+
+  const updatedTudo = {
+    ...user.todos[todoIndex],
+    deadline,
+    title,
+  };
+
+  user.todos[todoIndex] = updatedTudo;
+
+  return response.status(204).send();
 });
 
 app.patch("/todos/:id/done", checksExistsUserAccount, (request, response) => {
