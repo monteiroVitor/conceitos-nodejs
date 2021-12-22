@@ -58,7 +58,26 @@ app.get("/todos", checksExistsUserAccount, (request, response) => {
 });
 
 app.post("/todos", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { user } = request;
+  const { title, deadline } = request.body;
+
+  if (!title || !deadline) {
+    return response
+      .status(400)
+      .json({ error: "Title and deadline properties cannot be empty" });
+  }
+
+  const newTodo = {
+    title,
+    id: uuidv4(),
+    done: false,
+    deadline: new Date(deadline),
+    created_at: new Date(),
+  };
+
+  user.todos.push(newTodo);
+
+  return response.status(201).json(newTodo);
 });
 
 app.put("/todos/:id", checksExistsUserAccount, (request, response) => {
