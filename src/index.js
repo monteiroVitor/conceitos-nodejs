@@ -1,14 +1,15 @@
 const express = require("express");
 const cors = require("cors");
 
-const { v4: uuidv4 } = require("uuid");
+const { v4: uuidv4, validate } = require("uuid");
 
 const app = express();
-
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
 const users = [];
+
+/** Middlewares */
 
 function checksExistsUserAccount(request, response, next) {
   const { username } = request.headers;
@@ -24,20 +25,61 @@ function checksExistsUserAccount(request, response, next) {
   return next();
 }
 
-function checksExistsTodo(request, response, next) {
+function checksCreateTodosUserAvailability(request, response, next) {
   const { user } = request;
-  const { id } = request.params;
 
-  const todoIndex = user.todos.findIndex((todo) => todo.id === id);
-
-  if (todoIndex === -1) {
-    return response.status(404).json({ error: "Todo not found" });
+  if (!user.pro && user.todos.length >= 10) {
+    return response
+      .status(403)
+      .json({ error: "User have reach the limit of todos per free account" });
   }
-
-  request.todoIndex = todoIndex;
 
   return next();
 }
+
+function checksTodoExists(request, response, next) {
+  const { id } = request.params;
+  const isIDValid = validate(id);
+
+  if (!isIDValid) {
+    return response.status(400).json({ error: "Invalid ID" });
+  }
+
+  const { username } = request.headers;
+
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  const todo = user.todos.find((todo) => todo.id === id);
+
+  if (!todo) {
+    return response.status(404).json({ error: "TODO not found" });
+  }
+
+  request.todo = todo;
+  request.user = user;
+
+  return next();
+}
+
+function findUserById(request, response, next) {
+  const { id } = request.params;
+
+  const user = users.find((user) => user.id === id);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  request.user = user;
+
+  return next();
+}
+
+/** Routes Users */
 
 app.post("/users", (request, response) => {
   const { name, username } = request.body;
@@ -45,12 +87,14 @@ app.post("/users", (request, response) => {
   if (!name || !username) {
     return response
       .status(400)
-      .json({ error: "Name and Username properties cannot be empty" });
+      .json({ error: "Name and Username must be provided" });
   }
 
-  const isUsernameValid = users.some((user) => user.username === username);
+  const usernameAlreadyExists = users.some(
+    (user) => user.username === username
+  );
 
-  if (isUsernameValid) {
+  if (usernameAlreadyExists) {
     return response.status(400).json({ error: "Username already exists" });
   }
 
@@ -58,6 +102,7 @@ app.post("/users", (request, response) => {
     id: uuidv4(),
     name,
     username,
+    pro: false,
     todos: [],
   };
 
@@ -66,80 +111,94 @@ app.post("/users", (request, response) => {
   return response.status(201).json(newUser);
 });
 
+app.get("/users/:id", findUserById, (request, response) => {
+  const { user } = request;
+
+  return response.json(user);
+});
+
+app.patch("/users/:id/pro", findUserById, (request, response) => {
+  const { user } = request;
+
+  if (user.pro) {
+    return response
+      .status(400)
+      .json({ error: "Pro plan is already activated" });
+  }
+
+  user.pro = true;
+
+  return response.json(user);
+});
+
+/** Routes Users TODOS */
+
 app.get("/todos", checksExistsUserAccount, (request, response) => {
   const { user } = request;
 
   return response.json(user.todos);
 });
 
-app.post("/todos", checksExistsUserAccount, (request, response) => {
-  const { user } = request;
-  const { title, deadline } = request.body;
-
-  if (!title || !deadline) {
-    return response
-      .status(400)
-      .json({ error: "Title and deadline properties cannot be empty" });
-  }
-
-  const newTodo = {
-    title,
-    id: uuidv4(),
-    done: false,
-    deadline: new Date(deadline),
-    created_at: new Date(),
-  };
-
-  user.todos.push(newTodo);
-
-  return response.status(201).json(newTodo);
-});
-
-app.put(
-  "/todos/:id",
+app.post(
+  "/todos",
   checksExistsUserAccount,
-  checksExistsTodo,
+  checksCreateTodosUserAvailability,
   (request, response) => {
-    const { user, todoIndex } = request;
-    const { deadline, title } = request.body;
+    const { title, deadline } = request.body;
+    const { user } = request;
 
     if (!title || !deadline) {
       return response
         .status(400)
-        .json({ error: "Title and deadline properties cannot be empty" });
+        .json({ error: "Title and Deadline must be provided" });
     }
 
-    const updatedTudo = {
-      ...user.todos[todoIndex],
-      deadline,
+    const newTodo = {
+      id: uuidv4(),
       title,
+      deadline: new Date(deadline),
+      done: false,
+      created_at: new Date(),
     };
 
-    user.todos[todoIndex] = updatedTudo;
+    user.todos.push(newTodo);
 
-    return response.json(updatedTudo);
+    return response.status(201).json(newTodo);
   }
 );
 
-app.patch(
-  "/todos/:id/done",
-  checksExistsUserAccount,
-  checksExistsTodo,
-  (request, response) => {
-    const { user, todoIndex } = request;
+app.put("/todos/:id", checksTodoExists, (request, response) => {
+  const { title, deadline } = request.body;
+  const { todo } = request;
 
-    user.todos[todoIndex].done = true;
-
-    return response.json(user.todos[todoIndex]);
+  if (!title || !deadline) {
+    return response
+      .status(400)
+      .json({ error: "Title and Deadline must be provided" });
   }
-);
+
+  todo.title = title;
+  todo.deadline = new Date(deadline);
+
+  return response.json(todo);
+});
+
+app.patch("/todos/:id/done", checksTodoExists, (request, response) => {
+  const { todo } = request;
+
+  todo.done = true;
+
+  return response.json(todo);
+});
 
 app.delete(
   "/todos/:id",
   checksExistsUserAccount,
-  checksExistsTodo,
+  checksTodoExists,
   (request, response) => {
-    const { user, todoIndex } = request;
+    const { user, todo } = request;
+
+    const todoIndex = user.todos.indexOf(todo);
 
     user.todos.splice(todoIndex, 1);
 
@@ -147,4 +206,11 @@ app.delete(
   }
 );
 
-module.exports = app;
+module.exports = {
+  app,
+  users,
+  checksExistsUserAccount,
+  checksCreateTodosUserAvailability,
+  checksTodoExists,
+  findUserById,
+};
