@@ -12,39 +12,131 @@ const users = [];
 /** Middlewares */
 
 function checksExistsUserAccount(request, response, next) {
-  // Complete aqui
+  const { username } = request.headers;
+
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  request.user = user;
+
+  return next();
 }
 
 function checksCreateTodosUserAvailability(request, response, next) {
-  // Complete aqui
+  const { user } = request;
+
+  if (!user.pro && user.todos.length >= 10) {
+    return response
+      .status(403)
+      .json({ error: "User have reach the limit of todos per free account" });
+  }
+
+  return next();
 }
 
 function checksTodoExists(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+  const isIDValid = validate(id);
+
+  if (!isIDValid) {
+    return response.status(400).json({ error: "Invalid ID" });
+  }
+
+  const { username } = request.headers;
+
+  const user = users.find((user) => user.username === username);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  const todo = user.todos.find((todo) => todo.id === id);
+
+  if (!todo) {
+    return response.status(404).json({ error: "TODO not found" });
+  }
+
+  request.todo = todo;
+  request.user = user;
+
+  return next();
 }
 
 function findUserById(request, response, next) {
-  // Complete aqui
+  const { id } = request.params;
+
+  const user = users.find((user) => user.id === id);
+
+  if (!user) {
+    return response.status(404).json({ error: "User not found" });
+  }
+
+  request.user = user;
+
+  return next();
 }
 
 /** Routes Users */
 
 app.post("/users", (request, response) => {
-  // Complete aqui
+  const { name, username } = request.body;
+
+  if (!name || !username) {
+    return response
+      .status(400)
+      .json({ error: "Name and Username must be provided" });
+  }
+
+  const usernameAlreadyExists = users.some(
+    (user) => user.username === username
+  );
+
+  if (usernameAlreadyExists) {
+    return response.status(400).json({ error: "Username already exists" });
+  }
+
+  const newUser = {
+    id: uuidv4(),
+    name,
+    username,
+    pro: false,
+    todos: [],
+  };
+
+  users.push(newUser);
+
+  return response.status(201).json(newUser);
 });
 
 app.get("/users/:id", findUserById, (request, response) => {
-  // Complete aqui
+  const { user } = request;
+
+  return response.json(user);
 });
 
 app.patch("/users/:id/pro", findUserById, (request, response) => {
-  // Complete aqui
+  const { user } = request;
+
+  if (user.pro) {
+    return response
+      .status(400)
+      .json({ error: "Pro plan is already activated" });
+  }
+
+  user.pro = true;
+
+  return response.json(user);
 });
 
 /** Routes Users TODOS */
 
 app.get("/todos", checksExistsUserAccount, (request, response) => {
-  // Complete aqui
+  const { user } = request;
+
+  return response.json(user.todos);
 });
 
 app.post(
@@ -52,16 +144,51 @@ app.post(
   checksExistsUserAccount,
   checksCreateTodosUserAvailability,
   (request, response) => {
-    // Complete aqui
+    const { title, deadline } = request.body;
+    const { user } = request;
+
+    if (!title || !deadline) {
+      return response
+        .status(400)
+        .json({ error: "Title and Deadline must be provided" });
+    }
+
+    const newTodo = {
+      id: uuidv4(),
+      title,
+      deadline: new Date(deadline),
+      done: false,
+      created_at: new Date(),
+    };
+
+    user.todos.push(newTodo);
+
+    return response.status(201).json(newTodo);
   }
 );
 
 app.put("/todos/:id", checksTodoExists, (request, response) => {
-  // Complete aqui
+  const { title, deadline } = request.body;
+  const { todo } = request;
+
+  if (!title || !deadline) {
+    return response
+      .status(400)
+      .json({ error: "Title and Deadline must be provided" });
+  }
+
+  todo.title = title;
+  todo.deadline = new Date(deadline);
+
+  return response.json(todo);
 });
 
 app.patch("/todos/:id/done", checksTodoExists, (request, response) => {
-  // Complete aqui
+  const { todo } = request;
+
+  todo.done = true;
+
+  return response.json(todo);
 });
 
 app.delete(
@@ -69,7 +196,13 @@ app.delete(
   checksExistsUserAccount,
   checksTodoExists,
   (request, response) => {
-    // Complete aqui
+    const { user, todo } = request;
+
+    const todoIndex = user.todos.indexOf(todo);
+
+    user.todos.splice(todoIndex, 1);
+
+    return response.status(204).send();
   }
 );
 
