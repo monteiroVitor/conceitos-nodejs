@@ -40,7 +40,9 @@ curl --request POST \
 Possíveis respostas:
 
 201 - Corpo da resposta contêm o objeto representando o usuário criado.
+
 400 - O Request deve conter as propriedades Name e Username.
+
 400 - Username já existe.
 
 - Consultar dados do usuário
@@ -51,6 +53,7 @@ curl --request GET \
 Possíveis respostas:
 
 200 - Corpo da resposta contêm os dados do usuário.
+
 404 - Usuário não encontrado.
 
 - Transformar usuário em PRO
@@ -61,7 +64,9 @@ curl --request PATCH \
 ```
 
 200 - Corpo da resposta contêm os dados do usuário.
+
 400 - Plano PRO está ativo.
+
 404 - Usuário não encontrado.
 
 - Adicionar TODOS
@@ -78,8 +83,11 @@ curl --request POST \
 ```
 
 201 - Corpo da resposta contêm o objeto representando o TODO criado.
+
 400 - O Request deve conter as propriedades Title e Deadline.
+
 403 - Usuário atingiu o limite de TODOS criados (contas não PRO).
+
 404 - Usuário não encontrado.
 
 - Visualizar TODOS
@@ -91,6 +99,7 @@ curl --request GET \
 ```
 
 200 - Corpo da resposta contêm todos os TODOS do usuário.
+
 404 - Usuário não encontrado.
 
 
@@ -108,9 +117,13 @@ curl --request PUT \
 ```
 
 200 - Corpo da resposta contêm os dados atualizados do TODO.
+
 400 - O Request deve conter as propriedades Title e Deadline.
+
 400 - UUID Inválido. 
+
 404 - Usuário não encontrado.
+
 404 - TODO não encontrado.
 
 - Solucionar TODO
@@ -122,8 +135,11 @@ curl --request PATCH \
 ```
 
 200 - Corpo da resposta contêm os dados atualizados do TODO.
+
 400 - UUID Inválido. 
+
 404 - Usuário não encontrado.
+
 404 - TODO não encontrado.
 
 - Deletar TODO
@@ -135,6 +151,9 @@ curl --request DELETE \
 ```
 
 204 - TODO removido.
+
 400 - UUID Inválido. 
+
 404 - Usuário não encontrado.
+
 404 - TODO não encontrado.
